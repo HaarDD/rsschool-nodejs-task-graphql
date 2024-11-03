@@ -1,3 +1,5 @@
+## Please, go to [develop branch](https://github.com/HaarDD/rsschool-nodejs-task-graphql/tree/develop)!
+
 ## Assignment: Graphql
 
 ### Tasks:  
