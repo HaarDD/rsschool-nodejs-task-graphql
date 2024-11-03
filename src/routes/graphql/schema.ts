@@ -77,8 +77,8 @@ const MutationType = new GraphQLObjectType({
       args: {
         dto: { type: new GraphQLNonNull(CreateUserInput) },
       },
-      resolve: async (_, { dto }, { prisma, fastify }) => {
-        fastify.log.info(`Creating User with data: ${JSON.stringify(dto)}`);
+      resolve: async (_, { dto }, { prisma, log }) => {
+        log.info(`Creating User with data: ${JSON.stringify(dto)}`);
         return prisma.user.create({ data: dto });
       },
     },
@@ -87,10 +87,10 @@ const MutationType = new GraphQLObjectType({
       args: {
         dto: { type: new GraphQLNonNull(CreateProfileInput) },
       },
-      resolve: async (_, { dto }, { prisma, fastify }) => {
-        fastify.log.info(`Creating Profile with data: ${JSON.stringify(dto)}`);
+      resolve: async (_, { dto }, { prisma, log }) => {
+        log.info(`Creating Profile with data: ${JSON.stringify(dto)}`);
 
-        const { memberTypeId } = dto;
+/*         const { memberTypeId } = dto;
 
         let memberType = await prisma.memberType.findUnique({ where: { id: memberTypeId } });
         if (!memberType && memberTypeId === 'BASIC') {
@@ -101,8 +101,8 @@ const MutationType = new GraphQLObjectType({
               postsLimitPerMonth: 10,
             },
           });
-          fastify.log.info("Created default MemberType 'BASIC'");
-        }
+          log.info("Created default MemberType 'BASIC'");
+        } */
 
         return prisma.profile.create({ data: dto });
       },
@@ -112,15 +112,10 @@ const MutationType = new GraphQLObjectType({
       args: {
         dto: { type: new GraphQLNonNull(CreatePostInput) },
       },
-      resolve: async (_, { dto }, { prisma, fastify }) => {
-        fastify.log.info(`Creating Post with data: ${JSON.stringify(dto)}`);
+      resolve: async (_, { dto }, { prisma, log }) => {
+        log.info(`Creating Post with data: ${JSON.stringify(dto)}`);
         return prisma.post.create({
-          data: {
-            title: dto.title,
-            content: dto.content,
-            published: new Date().toISOString(),
-            authorId: dto.authorId,
-          },
+          data: dto,
         });
       },
     },
@@ -130,8 +125,8 @@ const MutationType = new GraphQLObjectType({
         id: { type: new GraphQLNonNull(UUIDType) },
         dto: { type: new GraphQLNonNull(ChangePostInput) },
       },
-      resolve: async (_, { id, dto }, { prisma, fastify }) => {
-        fastify.log.info(`Updating Post with id: ${id} with data: ${JSON.stringify(dto)}`);
+      resolve: async (_, { id, dto }, { prisma, log }) => {
+        log.info(`Updating Post with id: ${id} with data: ${JSON.stringify(dto)}`);
         return prisma.post.update({ where: { id }, data: dto });
       },
     },
@@ -141,8 +136,8 @@ const MutationType = new GraphQLObjectType({
         id: { type: new GraphQLNonNull(UUIDType) },
         dto: { type: new GraphQLNonNull(ChangeProfileInput) },
       },
-      resolve: async (_, { id, dto }, { prisma, fastify }) => {
-        fastify.log.info(`Updating Profile with id: ${id} with data: ${JSON.stringify(dto)}`);
+      resolve: async (_, { id, dto }, { prisma, log }) => {
+        log.info(`Updating Profile with id: ${id} with data: ${JSON.stringify(dto)}`);
         return prisma.profile.update({ where: { id }, data: dto });
       },
     },
@@ -152,8 +147,8 @@ const MutationType = new GraphQLObjectType({
         id: { type: new GraphQLNonNull(UUIDType) },
         dto: { type: new GraphQLNonNull(ChangeUserInput) },
       },
-      resolve: async (_, { id, dto }, { prisma, fastify }) => {
-        fastify.log.info(`Updating User with id: ${id} with data: ${JSON.stringify(dto)}`);
+      resolve: async (_, { id, dto }, { prisma, log }) => {
+        log.info(`Updating User with id: ${id} with data: ${JSON.stringify(dto)}`);
         return prisma.user.update({ where: { id }, data: dto });
       },
     },
@@ -162,8 +157,8 @@ const MutationType = new GraphQLObjectType({
       args: {
         id: { type: new GraphQLNonNull(UUIDType) },
       },
-      resolve: async (_, { id }, { prisma, fastify }) => {
-        fastify.log.info(`Deleting User with id: ${id}`);
+      resolve: async (_, { id }, { prisma, log }) => {
+        log.info(`Deleting User with id: ${id}`);
         await prisma.user.delete({ where: { id } });
         return "User deleted";
       },
@@ -173,8 +168,8 @@ const MutationType = new GraphQLObjectType({
       args: {
         id: { type: new GraphQLNonNull(UUIDType) },
       },
-      resolve: async (_, { id }, { prisma, fastify }) => {
-        fastify.log.info(`Deleting Post with id: ${id}`);
+      resolve: async (_, { id }, { prisma, log }) => {
+        log.info(`Deleting Post with id: ${id}`);
         await prisma.post.delete({ where: { id } });
         return "Post deleted";
       },
@@ -184,47 +179,49 @@ const MutationType = new GraphQLObjectType({
       args: {
         id: { type: new GraphQLNonNull(UUIDType) },
       },
-      resolve: async (_, { id }, { prisma, fastify }) => {
-        fastify.log.info(`Deleting Profile with id: ${id}`);
+      resolve: async (_, { id }, { prisma, log }) => {
+        log.info(`Deleting Profile with id: ${id}`);
         await prisma.profile.delete({ where: { id } });
         return "Profile deleted";
       },
     },
     subscribeTo: {
-      type: GraphQLString,
+      type: new GraphQLNonNull(GraphQLString),
       args: {
         userId: { type: new GraphQLNonNull(UUIDType) },
         authorId: { type: new GraphQLNonNull(UUIDType) },
       },
-      resolve: async (_, { userId, authorId }, { prisma, fastify }) => {
-        fastify.log.info(`User ${userId} subscribing to Author ${authorId}`);
-        await prisma.user.update({
-          where: { id: userId },
+      resolve: async (_, { userId, authorId }, { prisma, log }) => {
+        log.info(`User ${userId} subscribing to Author ${authorId}`);
+
+        await prisma.subscribersOnAuthors.create({
           data: {
-            userSubscribedTo: {
-              connect: { id: authorId },
-            },
+            subscriberId: userId,
+            authorId: authorId,
           },
         });
+
         return "Subscribed";
       },
     },
     unsubscribeFrom: {
-      type: GraphQLString,
+      type: new GraphQLNonNull(GraphQLString),
       args: {
         userId: { type: new GraphQLNonNull(UUIDType) },
         authorId: { type: new GraphQLNonNull(UUIDType) },
       },
-      resolve: async (_, { userId, authorId }, { prisma, fastify }) => {
-        fastify.log.info(`User ${userId} unsubscribing from Author ${authorId}`);
-        await prisma.user.update({
-          where: { id: userId },
-          data: {
-            userSubscribedTo: {
-              disconnect: { id: authorId },
+      resolve: async (_, { userId, authorId }, { prisma, log }) => {
+        log.info(`User ${userId} unsubscribing from Author ${authorId}`);
+
+        await prisma.subscribersOnAuthors.delete({
+          where: {
+            subscriberId_authorId: {
+              subscriberId: userId,
+              authorId: authorId,
             },
           },
         });
+        
         return "Unsubscribed";
       },
     },
