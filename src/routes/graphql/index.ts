@@ -1,18 +1,20 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
-/* eslint-disable @typescript-eslint/no-floating-promises */
-/* eslint-disable @typescript-eslint/no-unsafe-assignment */
-
 import { FastifyPluginAsync } from 'fastify';
-import { execute, parse, validate } from 'graphql';
-import { schema } from './schema.js';
-import { createMemberTypeLoader, createPostLoader, createProfileLoader, createSubscribedToLoader, createSubscribersLoader, createUserLoader } from './dataloader.js';
+import { execute, GraphQLSchema, parse, validate } from 'graphql';
+import { createMemberTypeLoader, createPostLoader, createProfileLoader, createSubscribedToLoader, createSubscribersLoader, createUserLoader } from './dataloaders/dataloader.js';
 import depthLimit from 'graphql-depth-limit';
+import { QueryType } from './resolvers/queries.js';
+import { MutationType } from './resolvers/mutations.js';
 
 declare module 'fastify' {
   interface FastifyInstance {
     userLoader: ReturnType<typeof createUserLoader>;
   }
 }
+
+const schema =  new GraphQLSchema({
+  query: QueryType,
+  mutation: MutationType,
+})
 
 const plugin: FastifyPluginAsync = async (fastify) => {
   fastify.decorate('userLoader', createUserLoader(fastify.prisma));
@@ -21,14 +23,14 @@ const plugin: FastifyPluginAsync = async (fastify) => {
     const { query, variables } = request.body as 
     { 
       query: string; 
-      variables?: Record<string, any> 
+      variables?: Record<string, unknown> 
     };
 
     const document = parse(query);
     const validationErrors = validate(schema, document, [depthLimit(5)]);
 
     if (validationErrors.length > 0) {
-      reply.send({ errors: validationErrors });
+      await reply.send({ errors: validationErrors });
       return;
     }
 
@@ -48,7 +50,7 @@ const plugin: FastifyPluginAsync = async (fastify) => {
       },
     });
 
-    reply.send(result);
+    await reply.send(result);
   });
 };
 

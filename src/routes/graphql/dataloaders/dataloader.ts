@@ -1,9 +1,7 @@
-/* eslint-disable @typescript-eslint/no-unsafe-return */
-
 import DataLoader from 'dataloader';
 import { PrismaClient, User, Post, Profile, MemberType } from '@prisma/client';
 
-const batchUsers = async (ids: readonly string[], prisma: PrismaClient): Promise<(User | null)[]> => {
+const batchLoadUsers = async (ids: readonly string[], prisma: PrismaClient): Promise<(User | null)[]> => {
   const users = await prisma.user.findMany({
     where: { id: { in: [...ids] } },
   });
@@ -11,7 +9,7 @@ const batchUsers = async (ids: readonly string[], prisma: PrismaClient): Promise
   return ids.map((id) => userMap.get(id) || null);
 };
 
-const batchPosts = async (authorIds: readonly string[], prisma: PrismaClient): Promise<Post[][]> => {
+const batchLoadPosts = async (authorIds: readonly string[], prisma: PrismaClient): Promise<Post[][]> => {
   const posts = await prisma.post.findMany({
     where: { authorId: { in: [...authorIds] } },
   });
@@ -42,9 +40,9 @@ const batchMemberTypes = async (ids: readonly string[], prisma: PrismaClient): P
 const batchSubscribedTo = async (subscriberIds: readonly string[], prisma: PrismaClient): Promise<User[][]> => {
   const subscriptions = await prisma.subscribersOnAuthors.findMany({
     where: { subscriberId: { in: [...subscriberIds] } },
-    include: { author: true }, // Включаем данные автора сразу
+    include: { author: true },
   });
-  
+
   const subscriptionMap = new Map<string, User[]>();
   subscriberIds.forEach(id => subscriptionMap.set(id, []));
   subscriptions.forEach(sub => {
@@ -56,9 +54,9 @@ const batchSubscribedTo = async (subscriberIds: readonly string[], prisma: Prism
 const batchSubscribers = async (authorIds: readonly string[], prisma: PrismaClient): Promise<User[][]> => {
   const subscriptions = await prisma.subscribersOnAuthors.findMany({
     where: { authorId: { in: [...authorIds] } },
-    include: { subscriber: true }, // Включаем данные подписчика сразу
+    include: { subscriber: true },
   });
-  
+
   const subscriptionMap = new Map<string, User[]>();
   authorIds.forEach(id => subscriptionMap.set(id, []));
   subscriptions.forEach(sub => {
@@ -67,20 +65,20 @@ const batchSubscribers = async (authorIds: readonly string[], prisma: PrismaClie
   return authorIds.map(id => subscriptionMap.get(id) || []);
 };
 
-export const createUserLoader = (prisma: PrismaClient) => 
-  new DataLoader((keys: readonly string[]) => batchUsers(keys, prisma));
+export const createUserLoader = (prisma: PrismaClient) =>
+  new DataLoader((keys: readonly string[]) => batchLoadUsers(keys, prisma));
 
-export const createPostLoader = (prisma: PrismaClient) => 
-  new DataLoader((keys: readonly string[]) => batchPosts(keys, prisma));
+export const createPostLoader = (prisma: PrismaClient) =>
+  new DataLoader((keys: readonly string[]) => batchLoadPosts(keys, prisma));
 
-export const createProfileLoader = (prisma: PrismaClient) => 
+export const createProfileLoader = (prisma: PrismaClient) =>
   new DataLoader((keys: readonly string[]) => batchProfiles(keys, prisma));
 
-export const createMemberTypeLoader = (prisma: PrismaClient) => 
+export const createMemberTypeLoader = (prisma: PrismaClient) =>
   new DataLoader((keys: readonly string[]) => batchMemberTypes(keys, prisma));
 
-export const createSubscribedToLoader = (prisma: PrismaClient) => 
+export const createSubscribedToLoader = (prisma: PrismaClient) =>
   new DataLoader((keys: readonly string[]) => batchSubscribedTo(keys, prisma));
 
-export const createSubscribersLoader = (prisma: PrismaClient) => 
+export const createSubscribersLoader = (prisma: PrismaClient) =>
   new DataLoader((keys: readonly string[]) => batchSubscribers(keys, prisma));
