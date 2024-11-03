@@ -2,21 +2,26 @@
 /* eslint-disable @typescript-eslint/no-unsafe-call */
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
 /* eslint-disable @typescript-eslint/no-unsafe-return */
-import { GraphQLObjectType, GraphQLNonNull, GraphQLString, GraphQLInt, GraphQLList, GraphQLFloat, GraphQLBoolean, GraphQLScalarType, Kind } from 'graphql';
-import { UUIDType } from './types/uuid.js';
+import { 
+  GraphQLObjectType, 
+  GraphQLNonNull, 
+  GraphQLString, 
+  GraphQLInt, 
+  GraphQLList, 
+  GraphQLFloat, 
+  GraphQLBoolean, 
+  GraphQLScalarType, 
+  Kind 
+} from 'graphql';
+import { UUIDType } from './types/uuid.js'; // Предполагается, что вы экспортируете MemberTypeType отдельно
 
-export const ProfileType = new GraphQLObjectType({
-  name: 'Profile',
+export const MemberTypeType = new GraphQLObjectType({
+  name: 'MemberType',
   fields: () => ({
-    id: { type: new GraphQLNonNull(UUIDType) },
-    isMale: { type: new GraphQLNonNull(GraphQLBoolean) },
-    yearOfBirth: { type: new GraphQLNonNull(GraphQLInt) },
-    memberTypeId: { type: new GraphQLNonNull(GraphQLString) },
-    memberType: {
-      type: MemberTypeType,
-      resolve: (profile, _, { prisma }) => prisma.memberType.findUnique({ where: { id: profile.memberTypeId } }),
-    },
-  }),
+    id: { type: new GraphQLNonNull(GraphQLString) },
+    discount: { type: new GraphQLNonNull(GraphQLFloat) },
+    postsLimitPerMonth: { type: new GraphQLNonNull(GraphQLInt) }
+  })
 });
 
 export const MemberTypeIdScalar = new GraphQLScalarType({
@@ -36,13 +41,18 @@ export const MemberTypeIdScalar = new GraphQLScalarType({
   },
 });
 
-export const MemberTypeType = new GraphQLObjectType({
-  name: 'MemberType',
+export const ProfileType = new GraphQLObjectType({
+  name: 'Profile',
   fields: () => ({
-    id: { type: new GraphQLNonNull(GraphQLString) },
-    discount: { type: new GraphQLNonNull(GraphQLFloat) },
-    postsLimitPerMonth: { type: new GraphQLNonNull(GraphQLInt) }
-  })
+    id: { type: new GraphQLNonNull(UUIDType) },
+    isMale: { type: new GraphQLNonNull(GraphQLBoolean) },
+    yearOfBirth: { type: new GraphQLNonNull(GraphQLInt) },
+    memberTypeId: { type: new GraphQLNonNull(GraphQLString) },
+    memberType: {
+      type: MemberTypeType,
+      resolve: (profile, _, { memberTypeLoader }) => memberTypeLoader.load(profile.memberTypeId),
+    },
+  }),
 });
 
 export const PostType = new GraphQLObjectType({
@@ -53,8 +63,8 @@ export const PostType = new GraphQLObjectType({
     content: { type: new GraphQLNonNull(GraphQLString) },
     authorId: { type: new GraphQLNonNull(UUIDType) },
     author: {
-      type: UserType,
-      resolve: (post, _, { prisma }) => prisma.user.findUnique({ where: { id: post.authorId } })
+      type: UserType, // Определите UserType ниже или импортируйте, если он определен в другом месте
+      resolve: (post, _, { userLoader }) => userLoader.load(post.authorId), // Изменено на использование DataLoader
     }
   })
 });
@@ -67,43 +77,19 @@ export const UserType = new GraphQLObjectType({
     balance: { type: new GraphQLNonNull(GraphQLFloat) },
     profile: {
       type: ProfileType,
-      resolve: (user, _, { prisma }) => prisma.profile.findUnique({ where: { userId: user.id } })
+      resolve: (user, _, { profileLoader }) => profileLoader.load(user.id),
     },
     posts: {
       type: new GraphQLList(PostType),
-      resolve: (user, _, { prisma }) => prisma.post.findMany({ where: { authorId: user.id } })
+      resolve: (user, _, { postLoader }) => postLoader.load(user.id),
     },
     userSubscribedTo: {
       type: new GraphQLList(UserType),
-      resolve: async (user, _, { prisma }) => {
-        const subscriptions = await prisma.subscribersOnAuthors.findMany({
-          where: { subscriberId: user.id },
-          include: {
-            author: {
-              include: {
-                subscribedToUser: true
-              }
-            }
-          }
-        });
-        return subscriptions.map(sub => sub.author);
-      },
+      resolve: (user, _, { subscribedToLoader }) => subscribedToLoader.load(user.id),
     },
     subscribedToUser: {
-      type: new GraphQLList(UserType),
-      resolve: async (user, _, { prisma }) => {
-        const subscribers = await prisma.subscribersOnAuthors.findMany({
-          where: { authorId: user.id },
-          include: {
-            subscriber: {
-              include: {
-                userSubscribedTo: true
-              }
-            }
-          }
-        });
-        return subscribers.map(sub => sub.subscriber);
-      },
+      type: new GraphQLList(UserType), 
+      resolve: (user, _, { subscribersLoader }) => subscribersLoader.load(user.id),
     }
   })
 });
